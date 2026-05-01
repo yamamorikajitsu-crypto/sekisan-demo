@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>建設積算自動化システム</title>
+
+  <!-- PDF生成ライブラリ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Excel出力ライブラリ -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+  <style>
+    /* ===== デザインシステム変数 ===== */
+    :root {
+      --primary:    #1a4a8a;
+      --primary-lt: #2a6bc7;
+      --accent:     #f28c00;
+      --success:    #1a7a4a;
+      --danger:     #c0392b;
+      --bg:         #f4f6f9;
+      --card:       #ffffff;
+      --border:     #dde2ea;
+      --text:       #1e2535;
+      --muted:      #6b7a99;
+      --radius:     10px;
+      --shadow:     0 2px 12px rgba(26,74,138,.08);
+    }
+
+    /* ===== リセット & ベース ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "BIZ UDPGothic", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ===== ヘッダー ===== */
+    .header {
+      background: var(--primary);
+      color: #fff;
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    }
+    .header-logo { font-size: 18px; font-weight: 700; letter-spacing: .03em; }
+    .header-logo span { color: var(--accent); }
+    .header-meta { font-size: 12px; opacity: .7; }
+
+    /* ===== ナビゲーション ===== */
+    .nav {
+      display: flex;
+      gap: 4px;
+      padding: 12px 24px 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+    .nav-tab {
+      padding: 10px 20px;
+      border: none;
+      background: none;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      border-bottom: 3px solid transparent;
+      transition: all .2s;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .nav-tab:hover { color: var(--primary); background: #f0f4ff; }
+    .nav-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+    /* ===== メインレイアウト ===== */
+    .main { max-width: 1200px; margin: 0 auto; padding: 24px 24px 80px; }
+
+    /* ===== パネル表示切替 ===== */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ===== カード ===== */
+    .card {
+      background: var(--card);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      padding: 20px 24px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title .badge {
+      background: var(--primary);
+      color: #fff;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    /* ===== フォーム ===== */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 7px;
+      font-size: 14px;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .2s;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus { border-color: var(--primary-lt); box-shadow: 0 0 0 3px rgba(42,107,199,.1); }
+    .form-group input[type="number"] { font-variant-numeric: tabular-nums; }
+
+    /* ===== ボタン ===== */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 9px 18px;
+      border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .18s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-lt); transform: translateY(-1px); }
+    .btn-accent { background: var(--accent); color: #fff; }
+    .btn-accent:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { filter: brightness(1.1); }
+    .btn-danger { background: var(--danger); color: #fff; padding: 6px 12px; font-size: 12px; }
+    .btn-danger:hover { filter: brightness(1.1); }
+    .btn-outline {
+      background: transparent;
+      color: var(--primary);
+      border: 1.5px solid var(--primary);
+    }
+    .btn-outline:hover { background: #f0f4ff; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    /* ===== 明細テーブル ===== */
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+    .items-table th {
+      background: var(--primary);
+      color: #fff;
+      padding: 9px 10px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .items-table th:first-child { border-radius: 7px 0 0 0; }
+    .items-table th:last-child  { border-radius: 0 7px 0 0; }
+    .items-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .items-table tr:nth-child(even) td { background: #f8fafc; }
+    .items-table tr:hover td { background: #eef3ff; }
+    .items-table input {
+      width: 100%; border: 1px solid #dde2ea;
+      border-radius: 5px; padding: 5px 8px;
+      font-size: 13px; background: #fff;
+    }
+    .items-table input:focus { outline: 2px solid var(--primary-lt); }
+    .num-right { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ===== 集計エリア ===== */
+    .summary-box {
+      background: linear-gradient(135deg, #1a4a8a 0%, #2a6bc7 100%);
+      color: #fff;
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      margin-top: 16px;
+    }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+    .summary-item { text-align: center; }
+    .summary-label { font-size: 11px; opacity: .75; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+    .summary-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .summary-value.big { font-size: 28px; color: #ffd080; }
+
+    /* ===== AIパネル ===== */
+    .ai-result {
+      background: #f0f4ff;
+      border-left: 3px solid var(--primary);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      padding: 14px 16px;
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+    .ai-loading {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--muted); font-size: 13px;
+    }
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== ダッシュボード KPI カード ===== */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    .kpi-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+    .kpi-val   { font-size: 26px; font-weight: 700; color: var(--primary); margin-top: 4px; font-variant-numeric: tabular-nums; }
+    .kpi-sub   { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    /* ===== 案件リスト ===== */
+    .project-list { display: flex; flex-direction: column; gap: 10px; }
+    .project-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      transition: box-shadow .2s;
+    }
+    .project-card:hover { box-shadow: 0 4px 16px rgba(26,74,138,.14); border-color: var(--primary); }
+    .project-name { font-weight: 700; font-size: 14px; }
+    .project-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .project-amount { font-size: 18px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+    .project-actions { display: flex; gap: 6px; }
+
+    /* ===== 検索バー ===== */
+    .search-bar {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .search-bar input, .search-bar select {
+      flex: 1; min-width: 160px;
+      padding: 9px 12px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 14px;
+    }
+
+    /* ===== 会社設定 ===== */
+    .logo-preview {
+      width: 100px; height: 60px;
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: var(--muted);
+      overflow: hidden;
+    }
+    .logo-preview img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+    /* ===== 粗利スライダー ===== */
+    .slider-wrap { display: flex; align-items: center; gap: 12px; }
+    .slider-wrap input[type=range] { flex: 1; accent-color: var(--primary); }
+    .rate-display {
+      font-size: 20px; font-weight: 700;
+      color: var(--success); min-width: 60px; text-align: right;
+    }
+
+    /* ===== レスポンシブ ===== */
+    @media (max-width: 640px) {
+      .main { padding: 16px 12px 60px; }
+      .nav-tab { padding: 9px 12px; font-size: 12px; }
+      .summary-value.big { font-size: 22px; }
+      .project-card { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* ===== ステータスバッジ ===== */
+    .status {
+      display: inline-block; padding: 2px 10px;
+      border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+    .status-new      { background: #e8f4fd; color: #1565c0; }
+    .status-progress { background: #fff8e1; color: #f57f17; }
+    .status-done     { background: #e8f5e9; color: #2e7d32; }
+
+    /* ===== トースト通知 ===== */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--text); color: #fff;
+      padding: 12px 20px; border-radius: 10px;
+      font-size: 13px; font-weight: 600;
+      opacity: 0; pointer-events: none;
+      transition: opacity .3s;
+      z-index: 999;
+    }
+    .toast.show { opacity: 1; }
+
+    /* ===== ファイル入力 ===== */
+    .file-drop {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .file-drop:hover { border-color: var(--primary); background: #f0f4ff; }
+    .file-drop input { display: none; }
+    .file-drop-icon { font-size: 32px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+
+<!-- ===== ヘッダー ===== -->
+<header class="header">
+  <div class="header-logo">🏗 建設<span>積算</span>システム</div>
+  <div class="header-meta" id="header-date"></div>
+</header>
+
+<!-- ===== ナビ ===== -->
+<nav class="nav">
+  <button class="nav-tab active" onclick="showPanel('dashboard')">📊 ダッシュボード</button>
+  <button class="nav-tab" onclick="showPanel('input')">✏️ 新規見積</button>
+  <button class="nav-tab" onclick="showPanel('projects')">📁 案件一覧</button>
+  <button class="nav-tab" onclick="showPanel('settings')">⚙️ 会社設定</button>
+</nav>
+
+<!-- ===== メインコンテンツ ===== -->
+<main class="main">
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- ① ダッシュボード                    -->
+  <!-- ═══════════════════════════════════ -->
+  <section class="panel active" id="panel-dashboard">
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">📁 総案件数</div>
+        <div class="kpi-val" id="kpi-total">0</div>
+        <div class="kpi-sub">件</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">💴 総受注金額</div>
+        <div class="kpi-val" id="kpi-amount">¥0</div>
+        <div class="kpi-sub">（税込）</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">📈 平均粗利率</div>
+        <div class="kpi-val" id="kpi-margin">0%</div>
+        <div class="kpi-sub">全案件平均</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">🔥 今月の案件</div>
+        <div class="kpi-val" id="kpi-month">0</div>
+        <div class="kpi-sub">件</div>
+      </div>
+    </div>
+
+    <!-- 最近の案件 -->
+    <div class="card">
+      <div class="card-title">🕒 最近の案件</div>
+      <div id="recent-projects">
+        <p style="color:var(--muted);text-align:center;padding:20px 0">案件がまだありません。「新規見積」から作成してください。</p>
+      </div>
+    </div>
+
+    <!-- 粗利グラフ（簡易SVG） -->
+    <div class="card">
+      <div class="card-title">📊 案件別粗利率グラフ</div>
+      <svg id="margin-chart" width="100%" height="200" style="display:block"></svg>
+      <p id="chart-empty" style="color:var(--muted);text-align:center;padding:20px 0;display:none">グラフデータがありません</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- ② 新規見積入力                      -->
+  <!-- ═══════════════════════════════════ -->
+  <section class="panel" id="panel-input">
+
+    <!-- STEP 1: 基本情報 -->
+    <div class="card">
+      <div class="card-title">📋 STEP 1 — 基本情報入力 <span class="badge">必須</span></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>工事名</label>
+          <input type="text" id="f-name" placeholder="例：〇〇マンション外壁改修工事">
+        </div>
+        <div class="form-group">
+          <label>発注者名</label>
+          <input type="text" id="f-client" placeholder="例：株式会社〇〇">
+        </div>
+        <div class="form-group">
+          <label>工事場所</label>
+          <input type="text" id="f-location" placeholder="例：東京都渋谷区〇〇">
+        </div>
+        <div class="form-group">
+          <label>工期（開始）</label>
+          <input type="date" id="f-start">
+        </div>
+        <div class="form-group">
+          <label>工期（終了）</label>
+          <input type="date" id="f-end">
+        </div>
+        <div class="form-group">
+          <label>工事種別</label>
+          <select id="f-type">
+            <option value="建築">建築工事</option>
+            <option value="土木">土木工事</option>
+            <option value="電気">電気設備工事</option>
+            <option value="管工事">管工事</option>
+            <option value="塗装">塗装工事</option>
+            <option value="解体">解体工事</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2: PDF・AI解析 -->
+    <div class="card">
+      <div class="card-title">🤖 STEP 2 — AI解析 <span class="badge" style="background:var(--accent)">AI</span></div>
+
+      <!-- PDF図面アップロード -->
+      <label class="file-drop" for="pdf-upload">
+        <div class="file-drop-icon">📄</div>
+        <div style="font-weight:600">PDF図面をドロップ / クリックして選択</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">AIが数量・材料を自動抽出します（OCR解析）</div>
+        <input type="file" id="pdf-upload" accept=".pdf,.png,.jpg" onchange="handleFileUpload(this)">
+      </label>
+
+      <!-- AI機能ボタン群 -->
+      <div class="btn-group" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="aiAnalyzePDF()">📄 PDF解析（AI）</button>
+        <button class="btn btn-outline" onclick="aiSuggestPrice()">💡 単価提案（AI）</button>
+        <button class="btn btn-outline" onclick="aiGenerateTemplate()">📝 テンプレ生成（AI）</button>
+      </div>
+
+      <!-- AI出力エリア -->
+      <div id="ai-output" class="ai-result" style="display:none"></div>
+    </div>
+
+    <!-- STEP 3: 明細入力 -->
+    <div class="card">
+      <div class="card-title">📝 STEP 3 — 明細入力</div>
+
+      <div style="overflow-x:auto">
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width:30px">No</th>
+              <th style="width:220px">材料名 / 工種</th>
+              <th style="width:80px">単位</th>
+              <th style="width:90px">数量</th>
+              <th style="width:110px">単価（円）</th>
+              <th style="width:120px">金額（円）</th>
+              <th style="width:140px">備考</th>
+              <th style="width:60px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="items-body">
+            <!-- 行はJSで動的生成 -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="addItemRow()">＋ 行を追加</button>
+        <button class="btn btn-outline btn-sm" onclick="clearAllItems()">🗑 全クリア</button>
+      </div>
+
+      <!-- 利益率スライダー -->
+      <div style="margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px;border:1px solid var(--border)">
+        <div style="font-weight:700;font-size:13px;color:var(--primary);margin-bottom:10px">💹 粗利シミュレーション</div>
+        <div class="slider-wrap">
+          <span style="font-size:13px;color:var(--muted);min-width:60px">粗利率</span>
+          <input type="range" min="0" max="50" value="20" id="margin-slider" oninput="updateMargin(this.value)">
+          <div class="rate-display" id="margin-rate">20%</div>
+        </div>
+        <div style="margin-top:8px;font-size:12px;color:var(--muted)" id="margin-hint"></div>
+      </div>
+    </div>
+
+    <!-- 集計 -->
+    <div class="summary-box" id="summary-box">
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="summary-label">原価合計</div>
+          <div class="summary-value" id="s-cost">¥0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">粗利額</div>
+          <div class="summary-value" id="s-profit">¥0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">税抜き見積額</div>
+          <div class="summary-value" id="s-excl">¥0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">消費税（10%）</div>
+          <div class="summary-value" id="s-tax">¥0</div>
+        </div>
+        <div class="summary-item">
+          <div class="summary-label">🎯 税込合計金額</div>
+          <div class="summary-value big" id="s-total">¥0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存・出力ボタン -->
+    <div class="btn-group" style="margin-top:16px">
+      <button class="btn btn-primary" onclick="saveProject()">💾 案件を保存</button>
+      <button class="btn btn-accent" onclick="generatePDF()">📄 見積書PDFを出力</button>
+      <button class="btn btn-success" onclick="exportExcel()">📊 Excelエクスポート</button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- ③ 案件一覧                          -->
+  <!-- ═══════════════════════════════════ -->
+  <section class="panel" id="panel-projects">
+    <div class="card">
+      <div class="card-title">🔍 検索・絞り込み</div>
+      <div class="search-bar">
+        <input type="text" id="search-text" placeholder="工事名で検索..." oninput="renderProjectList()">
+        <select id="search-type" onchange="renderProjectList()">
+          <option value="">すべての工種</option>
+          <option value="建築">建築工事</option>
+          <option value="土木">土木工事</option>
+          <option value="電気">電気設備工事</option>
+          <option value="管工事">管工事</option>
+          <option value="塗装">塗装工事</option>
+          <option value="解体">解体工事</option>
+          <option value="その他">その他</option>
+        </select>
+        <select id="search-sort" onchange="renderProjectList()">
+          <option value="date-desc">日付（新しい順）</option>
+          <option value="date-asc">日付（古い順）</option>
+          <option value="amount-desc">金額（高い順）</option>
+          <option value="amount-asc">金額（低い順）</option>
+        </select>
+        <button class="btn btn-success btn-sm" onclick="exportAllCSV()">📥 CSV一括出力</button>
+      </div>
+    </div>
+
+    <div id="project-list-wrap">
+      <p style="color:var(--muted);text-align:center;padding:40px 0">案件がまだありません。</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- ④ 会社設定                          -->
+  <!-- ═══════════════════════════════════ -->
+  <section class="panel" id="panel-settings">
+    <div class="card">
+      <div class="card-title">🏢 会社情報（見積書に印刷されます）</div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>会社名</label>
+          <input type="text" id="s-company" placeholder="株式会社〇〇建設">
+        </div>
+        <div class="form-group">
+          <label>代表者名</label>
+          <input type="text" id="s-rep" placeholder="代表取締役 山田 太郎">
+        </div>
+        <div class="form-group">
+          <label>郵便番号・住所</label>
+          <input type="text" id="s-addr" placeholder="〒000-0000 東京都〇〇区〇〇">
+        </div>
+        <div class="form-group">
+          <label>電話番号</label>
+          <input type="text" id="s-tel" placeholder="03-0000-0000">
+        </div>
+        <div class="form-group">
+          <label>FAX番号</label>
+          <input type="text" id="s-fax" placeholder="03-0000-0001">
+        </div>
+        <div class="form-group">
+          <label>建設業許可番号</label>
+          <input type="text" id="s-license" placeholder="国土交通大臣許可（般-00）第00000号">
+        </div>
+        <div class="form-group">
+          <label>Anthropic API キー（AI機能用）</label>
+          <input type="password" id="s-apikey" placeholder="sk-ant-...">
+        </div>
+        <div class="form-group">
+          <label>ロゴ画像（PNG/JPG）</label>
+          <input type="file" id="s-logo" accept="image/*" onchange="previewLogo(this)">
+          <div class="logo-preview" style="margin-top:8px" id="logo-preview">
+            <span>ロゴなし</span>
+          </div>
+        </div>
+      </div>
+      <div class="btn-group" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="saveSettings()">💾 設定を保存</button>
+        <button class="btn btn-outline" onclick="loadSettings()">↩ リセット</button>
+      </div>
+    </div>
+
+    <!-- デモデータ挿入 -->
+    <div class="card">
+      <div class="card-title">🧪 デモ用サンプルデータ</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:12px">
+        システムの動作確認用サンプル案件を挿入します。
+      </p>
+      <button class="btn btn-accent" onclick="insertDemoData()">🧪 デモデータを挿入</button>
+      <button class="btn btn-danger" style="margin-left:8px" onclick="clearAllData()">🗑 全データ削除</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- トースト通知 -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== JavaScript ===== -->
+<script>
+/* =========================================================
+   グローバル状態管理
+   ========================================================= */
+let projects  = JSON.parse(localStorage.getItem('seisan_projects')  || '[]');
+let settings  = JSON.parse(localStorage.getItem('seisan_settings')  || '{}');
+let itemRows  = [];     // 現在編集中の明細行
+let editingId = null;   // 編集中の案件ID（nullなら新規）
+let uploadedFileName = '';
+
+/* =========================================================
+   初期化
+   ========================================================= */
+document.addEventListener('DOMContentLoaded', () => {
+  // 日付表示
+  const d = new Date();
+  document.getElementById('header-date').textContent =
+    `${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+
+  loadSettings();
+  initItemRows(5);   // 最初から5行用意
+  renderDashboard();
+  renderProjectList();
+});
+
+/* =========================================================
+   ナビゲーション
+   ========================================================= */
+function showPanel(name) {
+  // パネル切替
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+  // タブ切替
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'projects')  renderProjectList();
+}
+
+/* =========================================================
+   明細行管理
+   ========================================================= */
+function initItemRows(n = 5) {
+  itemRows = Array.from({ length: n }, (_, i) => ({
+    id: Date.now() + i,
+    name: '', unit: '式', qty: '', price: '', note: ''
+  }));
+  renderItemTable();
+}
+
+function addItemRow() {
+  itemRows.push({ id: Date.now(), name: '', unit: '式', qty: '', price: '', note: '' });
+  renderItemTable();
+}
+
+function deleteItemRow(id) {
+  itemRows = itemRows.filter(r => r.id !== id);
+  renderItemTable();
+}
+
+function clearAllItems() {
+  if (confirm('全明細を削除しますか？')) { initItemRows(5); updateSummary(); }
+}
+
+function renderItemTable() {
+  const units = ['式','m','m²','m³','本','本','枚','袋','kg','t','台','個','人工'];
+  const tbody = document.getElementById('items-body');
+  tbody.innerHTML = '';
+
+  itemRows.forEach((row, i) => {
+    const amount = (parseFloat(row.qty)||0) * (parseFloat(row.price)||0);
+    tbody.innerHTML += `
+      <tr data-id="${row.id}">
+        <td style="text-align:center;color:var(--muted)">${i+1}</td>
+        <td><input type="text" value="${row.name}" placeholder="材料名・工種"
+            onchange="updateRow(${row.id},'name',this.value)"></td>
+        <td>
+          <select style="width:100%;border:1px solid #dde2ea;border-radius:5px;padding:5px 6px;font-size:13px"
+              onchange="updateRow(${row.id},'unit',this.value)">
+            ${units.map(u => `<option ${u===row.unit?'selected':''}>${u}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" value="${row.qty}" placeholder="0" min="0"
+            onchange="updateRow(${row.id},'qty',this.value)" class="num-right"></td>
+        <td><input type="number" value="${row.price}" placeholder="0" min="0"
+            onchange="updateRow(${row.id},'price',this.value)" class="num-right"></td>
+        <td class="num-right" style="font-weight:600;color:var(--primary)">
+          ${amount > 0 ? '¥' + amount.toLocaleString() : '—'}
+        </td>
+        <td><input type="text" value="${row.note}" placeholder="備考"
+            onchange="updateRow(${row.id},'note',this.value)"></td>
+        <td style="text-align:center">
+          <button class="btn btn-danger" onclick="deleteItemRow(${row.id})">✕</button>
+        </td>
+      </tr>`;
+  });
+  updateSummary();
+}
+
+function updateRow(id, field, value) {
+  const row = itemRows.find(r => r.id === id);
+  if (row) { row[field] = value; renderItemTable(); }
+}
+
+/* =========================================================
+   集計計算
+   ========================================================= */
+function updateSummary() {
+  const cost = itemRows.reduce((sum, r) =>
+    sum + (parseFloat(r.qty)||0) * (parseFloat(r.price)||0), 0);
+  const rate   = parseFloat(document.getElementById('margin-slider').value) / 100;
+  const excl   = rate < 1 ? cost / (1 - rate) : cost;
+  const profit = excl - cost;
+  const tax    = excl * 0.1;
+  const total  = excl + tax;
+
+  document.getElementById('s-cost').textContent   = '¥' + Math.round(cost).toLocaleString();
+  document.getElementById('s-profit').textContent = '¥' + Math.round(profit).toLocaleString();
+  document.getElementById('s-excl').textContent   = '¥' + Math.round(excl).toLocaleString();
+  document.getElementById('s-tax').textContent    = '¥' + Math.round(tax).toLocaleString();
+  document.getElementById('s-total').textContent  = '¥' + Math.round(total).toLocaleString();
+
+  document.getElementById('margin-hint').textContent =
+    `原価 ¥${Math.round(cost).toLocaleString()} → 粗利 ¥${Math.round(profit).toLocaleString()} ／ 税込合計 ¥${Math.round(total).toLocaleString()}`;
+}
+
+function updateMargin(val) {
+  document.getElementById('margin-rate').textContent = val + '%';
+  updateSummary();
+}
+
+/* =========================================================
+   AI機能（Anthropic API呼び出し）
+   ========================================================= */
+async function callClaudeAPI(prompt) {
+  const apiKey = settings.apiKey || document.getElementById('s-apikey').value;
+  if (!apiKey) {
+    return '⚠️ API キーが設定されていません。「会社設定」タブでAnthropicのAPIキーを入力してください。\n\nデモとして下記の仮データを使用します：';
+  }
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-opus-4-5',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) return `API エラー: ${data.error.message}`;
+    return data.content?.[0]?.text || '応答なし';
+  } catch (e) {
+    return `通信エラー: ${e.message}`;
+  }
+}
+
+function showAILoading() {
+  const el = document.getElementById('ai-output');
+  el.style.display = 'block';
+  el.innerHTML = `<div class="ai-loading"><div class="spinner"></div>AIが解析中です...</div>`;
+}
+
+async function aiAnalyzePDF() {
+  showAILoading();
+  const fname = uploadedFileName || '（ファイル未選択）';
+  const prompt = `あなたは建設積算の専門家AIです。
+PDF図面ファイル「${fname}」からOCRで読み取った内容を基に、
+建設工事の材料リストと数量を日本語で回答してください。
+以下の形式で5〜8行の明細を出力してください：
+
+【AI解析結果】
+- 材料名: コンクリート　単位: m³　推定数量: 120　参考単価: ¥25,000
+- 材料名: 型枠合板　単位: m²　推定数量: 450　参考単価: ¥2,800
+（以下同様...）
+
+※ デモ用として一般的な建築工事の材料を想定して出力してください。`;
+
+  const result = await callClaudeAPI(prompt);
+  const el = document.getElementById('ai-output');
+  el.innerHTML = `<strong>🤖 AI解析結果（PDF OCR）</strong><br><br>${result.replace(/\n/g,'<br>')}
+    <br><br><button class="btn btn-primary btn-sm" onclick="applyAIItems()">✅ この内容を明細に適用</button>`;
+  el.dataset.raw = result;
+}
+
+async function aiSuggestPrice() {
+  const constructionName = document.getElementById('f-name').value || '一般建築工事';
+  const type = document.getElementById('f-type').value;
+  showAILoading();
+
+  const prompt = `あなたは建設積算の専門家AIです。
+工事名「${constructionName}」（${type}）について、
+過去の実績データを基に材料単価の相場を教えてください。
+
+以下の形式で7〜10行出力してください：
+【単価提案（${new Date().getFullYear()}年${new Date().getMonth()+1}月 関東地区相場）】
+- 材料名: ○○　単位: ○　市場単価: ¥○○○/○　変動幅: ±○%
+（以下続く...）
+
+また、工事全体の坪単価の目安も記載してください。`;
+
+  const result = await callClaudeAPI(prompt);
+  document.getElementById('ai-output').innerHTML =
+    `<strong>💡 AI単価提案</strong><br><br>${result.replace(/\n/g,'<br>')}`;
+}
+
+async function aiGenerateTemplate() {
+  const type = document.getElementById('f-type').value;
+  showAILoading();
+
+  const prompt = `あなたは建設積算の専門家AIです。
+「${type}」の標準的な見積テンプレートを作成してください。
+
+以下の形式で10行以内の明細テンプレートを出力してください：
+【${type}見積テンプレート】
+行番号|材料名・工種|単位|標準数量|目安単価
+1|仮設工事（養生・足場）|式|1|350000
+2|（以下続く...）
+
+最後に「工事の一般的な注意事項」を2〜3点加えてください。`;
+
+  const result = await callClaudeAPI(prompt);
+  const el = document.getElementById('ai-output');
+  el.innerHTML = `<strong>📝 AIテンプレート生成（${type}）</strong><br><br>${result.replace(/\n/g,'<br>')}
+    <br><br><button class="btn btn-primary btn-sm" onclick="applyTemplate(${JSON.stringify(result)})">✅ テンプレートを適用</button>`;
+}
+
+// AIが提案したアイテムを明細行に反映（デモ用簡易パース）
+function applyAIItems() {
+  const raw = document.getElementById('ai-output').dataset.raw || '';
+  const lines = raw.split('\n').filter(l => l.includes('材料名:') || l.includes('- 材料名'));
+  if (lines.length === 0) { showToast('適用できる明細が見つかりませんでした'); return; }
+
+  const newRows = lines.map((l, i) => {
+    const name  = (l.match(/材料名[：:]\s*([^\s　]+)/) || [])[1] || `材料${i+1}`;
+    const unit  = (l.match(/単位[：:]\s*([^\s　]+)/) || [])[1] || '式';
+    const qty   = (l.match(/数量[：:]\s*([\d.]+)/) || [])[1] || '1';
+    const price = (l.match(/単価[：:]\s*¥?([\d,]+)/) || [])[1]?.replace(/,/g,'') || '0';
+    return { id: Date.now() + i, name, unit, qty, price, note: 'AI提案' };
+  });
+
+  itemRows = [...itemRows.filter(r => r.name), ...newRows];
+  renderItemTable();
+  showToast(`${newRows.length}件の明細を追加しました`);
+}
+
+function applyTemplate(raw) {
+  showToast('テンプレートを参考に明細を手動入力してください');
+}
+
+/* =========================================================
+   ファイルアップロード処理
+   ========================================================= */
+function handleFileUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  uploadedFileName = file.name;
+  showToast(`📄 ${file.name} をアップロードしました`);
+  // ファイルドロップエリアを更新
+  const drop = input.closest('.file-drop');
+  drop.querySelector('div').textContent = `✅ ${file.name}`;
+}
+
+/* =========================================================
+   案件保存
+   ========================================================= */
+function saveProject() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { showToast('⚠️ 工事名を入力してください'); return; }
+
+  const cost   = itemRows.reduce((s,r) => s+(parseFloat(r.qty)||0)*(parseFloat(r.price)||0), 0);
+  const rate   = parseFloat(document.getElementById('margin-slider').value);
+  const excl   = rate < 100 ? cost / (1 - rate/100) : cost;
+  const total  = Math.round(excl * 1.1);
+
+  const project = {
+    id:       editingId || Date.now(),
+    name,
+    client:   document.getElementById('f-client').value,
+    location: document.getElementById('f-location').value,
+    type:     document.getElementById('f-type').value,
+    start:    document.getElementById('f-start').value,
+    end:      document.getElementById('f-end').value,
+    items:    JSON.parse(JSON.stringify(itemRows)),
+    marginRate: rate,
+    cost:     Math.round(cost),
+    excl:     Math.round(excl),
+    total,
+    createdAt: editingId
+      ? (projects.find(p=>p.id===editingId)?.createdAt || new Date().toISOString())
+      : new Date().toISOString()
+  };
+
+  if (editingId) {
+    projects = projects.map(p => p.id === editingId ? project : p);
+    showToast('✅ 案件を更新しました');
+  } else {
+    projects.unshift(project);
+    showToast('✅ 案件を保存しました');
+  }
+
+  localStorage.setItem('seisan_projects', JSON.stringify(projects));
+  editingId = null;
+  renderDashboard();
+  renderProjectList();
+}
+
+/* =========================================================
+   案件読み込み（編集）
+   ========================================================= */
+function loadProject(id) {
+  const p = projects.find(p => p.id === id);
+  if (!p) return;
+
+  editingId = id;
+  document.getElementById('f-name').value     = p.name;
+  document.getElementById('f-client').value   = p.client || '';
+  document.getElementById('f-location').value = p.location || '';
+  document.getElementById('f-type').value     = p.type || '建築';
+  document.getElementById('f-start').value    = p.start || '';
+  document.getElementById('f-end').value      = p.end || '';
+  document.getElementById('margin-slider').value = p.marginRate || 20;
+  document.getElementById('margin-rate').textContent = (p.marginRate||20) + '%';
+
+  itemRows = p.items ? JSON.parse(JSON.stringify(p.items)) : [];
+  renderItemTable();
+  updateSummary();
+
+  // 入力パネルへ移動
+  document.querySelectorAll('.nav-tab').forEach((t,i)=>t.classList.toggle('active',i===1));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-input').classList.add('active');
+  window.scrollTo(0,0);
+  showToast(`📝 「${p.name}」を編集中`);
+}
+
+function deleteProject(id) {
+  if (!confirm('この案件を削除しますか？')) return;
+  projects = projects.filter(p => p.id !== id);
+  localStorage.setItem('seisan_projects', JSON.stringify(projects));
+  renderDashboard();
+  renderProjectList();
+  showToast('🗑 案件を削除しました');
+}
+
+/* =========================================================
+   ダッシュボード描画
+   ========================================================= */
+function renderDashboard() {
+  const total  = projects.length;
+  const amount = projects.reduce((s,p)=>s+p.total,0);
+  const now    = new Date();
+  const month  = projects.filter(p=>new Date(p.createdAt).getMonth()===now.getMonth()).length;
+  const avgMargin = total
+    ? Math.round(projects.reduce((s,p)=>s+(p.marginRate||0),0)/total)
+    : 0;
+
+  document.getElementById('kpi-total').textContent  = total;
+  document.getElementById('kpi-amount').textContent = '¥' + amount.toLocaleString();
+  document.getElementById('kpi-margin').textContent = avgMargin + '%';
+  document.getElementById('kpi-month').textContent  = month;
+
+  // 最近の案件（5件）
+  const recWrap = document.getElementById('recent-projects');
+  if (projects.length === 0) {
+    recWrap.innerHTML = '<p style="color:var(--muted);text-align:center;padding:20px 0">案件がありません</p>';
+  } else {
+    recWrap.innerHTML = projects.slice(0,5).map(p => `
+      <div class="project-card" onclick="loadProject(${p.id})">
+        <div>
+          <div class="project-name">${p.name}</div>
+          <div class="project-meta">${p.client||'—'} ／ ${p.type} ／ ${fmtDate(p.createdAt)}</div>
+        </div>
+        <div class="project-amount">¥${p.total.toLocaleString()}</div>
+      </div>`).join('');
+  }
+
+  // 粗利グラフ（SVG棒グラフ）
+  drawMarginChart();
+}
+
+function drawMarginChart() {
+  const svg   = document.getElementById('margin-chart');
+  const empty = document.getElementById('chart-empty');
+  if (projects.length === 0) {
+    svg.style.display = 'none'; empty.style.display = '';
+    return;
+  }
+  svg.style.display = ''; empty.style.display = 'none';
+
+  const data  = projects.slice(0,10).reverse();
+  const W     = 660, H = 180;
+  const barW  = Math.min(50, (W - 60) / data.length - 8);
+  const maxR  = Math.max(...data.map(p=>p.marginRate||0), 1);
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H+40}`);
+  svg.innerHTML = data.map((p,i) => {
+    const x = 40 + i * ((W-60)/data.length);
+    const h = ((p.marginRate||0)/maxR) * H;
+    const y = H - h + 20;
+    const color = (p.marginRate||0) >= 20 ? '#1a7a4a' : (p.marginRate||0) >= 10 ? '#f28c00' : '#c0392b';
+    const label = p.name.length > 6 ? p.name.slice(0,5)+'…' : p.name;
+    return `
+      <rect x="${x}" y="${y}" width="${barW}" height="${h}" fill="${color}" rx="4" opacity="0.85"/>
+      <text x="${x+barW/2}" y="${y-4}" text-anchor="middle" font-size="11" fill="${color}" font-weight="700">${p.marginRate||0}%</text>
+      <text x="${x+barW/2}" y="${H+36}" text-anchor="middle" font-size="10" fill="#6b7a99">${label}</text>`;
+  }).join('');
+}
+
+/* =========================================================
+   案件一覧描画
+   ========================================================= */
+function renderProjectList() {
+  const text = (document.getElementById('search-text')?.value||'').toLowerCase();
+  const type = document.getElementById('search-type')?.value||'';
+  const sort = document.getElementById('search-sort')?.value||'date-desc';
+
+  let list = projects
+    .filter(p => (!text || p.name.toLowerCase().includes(text)))
+    .filter(p => (!type || p.type === type));
+
+  if (sort === 'date-desc')   list.sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+  if (sort === 'date-asc')    list.sort((a,b)=>a.createdAt.localeCompare(b.createdAt));
+  if (sort === 'amount-desc') list.sort((a,b)=>b.total-a.total);
+  if (sort === 'amount-asc')  list.sort((a,b)=>a.total-b.total);
+
+  const wrap = document.getElementById('project-list-wrap');
+  if (list.length === 0) {
+    wrap.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px 0">該当する案件がありません</p>';
+    return;
+  }
+
+  wrap.innerHTML = `<div class="project-list">` + list.map(p => `
+    <div class="project-card" onclick="loadProject(${p.id})">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div class="project-name">${p.name}</div>
+          <span class="status status-${p.status||'new'}">${{new:'新規',progress:'進行中',done:'完了'}[p.status||'new']}</span>
+        </div>
+        <div class="project-meta">
+          ${p.client||'—'} ／ ${p.type} ／ ${p.location||'—'} ／ ${fmtDate(p.createdAt)}
+        </div>
+        <div class="project-meta" style="margin-top:2px">
+          粗利率: <strong style="color:var(--success)">${p.marginRate||0}%</strong>
+          ／ 原価: ¥${(p.cost||0).toLocaleString()}
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="project-amount">¥${p.total.toLocaleString()}</div>
+        <div class="project-meta">税込合計</div>
+      </div>
+      <div class="project-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-accent btn-sm" onclick="generatePDFById(${p.id})">PDF</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteProject(${p.id})">削除</button>
+      </div>
+    </div>`).join('') + `</div>`;
+}
+
+/* =========================================================
+   PDF出力（jsPDF使用）
+   ========================================================= */
+async function generatePDF(id) {
+  const { jsPDF } = window.jspdf;
+
+  // IDが渡された場合はそのプロジェクトを使用、そうでなければ入力中の内容
+  let p;
+  if (id) {
+    p = projects.find(x => x.id === id);
+    if (!p) return;
+  } else {
+    // 入力パネルの内容を使用
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) { showToast('⚠️ 工事名を入力してください'); return; }
+    const cost  = itemRows.reduce((s,r)=>s+(parseFloat(r.qty)||0)*(parseFloat(r.price)||0),0);
+    const rate  = parseFloat(document.getElementById('margin-slider').value);
+    const excl  = rate < 100 ? cost / (1-rate/100) : cost;
+    p = {
+      name, client: document.getElementById('f-client').value,
+      location: document.getElementById('f-location').value,
+      type: document.getElementById('f-type').value,
+      items: JSON.parse(JSON.stringify(itemRows)),
+      marginRate: rate, cost: Math.round(cost),
+      excl: Math.round(excl), total: Math.round(excl*1.1),
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+
+  // 日本語フォントがない場合の代替（英語+記号で出力）
+  const W = 210, M = 15;
+
+  // === ヘッダー背景 ===
+  doc.setFillColor(26, 74, 138);
+  doc.rect(0, 0, W, 35, 'F');
+
+  // === タイトル ===
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.setFont('helvetica','bold');
+  doc.text('ESTIMATE / Mitsumori-sho', M, 20);
+  doc.setFontSize(9);
+  doc.text(`${fmtDate(p.createdAt)}  No.${p.id||'---'}`, M, 29);
+
+  // === 会社情報（右上） ===
+  doc.setFontSize(10);
+  doc.text(settings.company || 'Your Company Name', W-M, 14, {align:'right'});
+  doc.setFontSize(8);
+  doc.text(settings.address || '', W-M, 20, {align:'right'});
+  doc.text(settings.tel ? `TEL: ${settings.tel}` : '', W-M, 26, {align:'right'});
+
+  // === 基本情報 ===
+  doc.setTextColor(30, 37, 53);
+  doc.setFontSize(11);
+  doc.setFont('helvetica','bold');
+  doc.text('Project: ' + truncate(p.name, 40), M, 46);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);
+  doc.text(`Client: ${p.client||'—'}   Location: ${p.location||'—'}   Type: ${p.type}`, M, 53);
+
+  // === 区切り線 ===
+  doc.setDrawColor(200, 210, 225);
+  doc.line(M, 57, W-M, 57);
+
+  // === 明細テーブル ===
+  const headers = ['No','Item Name','Unit','Qty','Unit Price','Amount','Note'];
+  const colW    = [10, 60, 12, 18, 26, 28, 36];
+  let   y       = 64;
+
+  // ヘッダー行
+  doc.setFillColor(42, 107, 199);
+  doc.rect(M, y-5, W-M*2, 7, 'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(8);
+  doc.setFont('helvetica','bold');
+  let cx = M+1;
+  headers.forEach((h,i)=>{ doc.text(h, cx, y); cx += colW[i]; });
+
+  y += 4;
+  doc.setFont('helvetica','normal');
+
+  const validItems = p.items.filter(r=>r.name);
+  validItems.forEach((r, idx) => {
+    if (y > 250) { doc.addPage(); y = 20; }
+    const amount = (parseFloat(r.qty)||0)*(parseFloat(r.price)||0);
+    doc.setFillColor(idx%2===0?255:248,248,252);
+    doc.rect(M, y-4, W-M*2, 6.5, 'F');
+    doc.setTextColor(30,37,53);
+    doc.setFontSize(8);
+    cx = M+1;
+    const row = [
+      String(idx+1), truncate(r.name,22), r.unit||'',
+      r.qty||'', fmtNum(r.price), fmtNum(amount), truncate(r.note||'',14)
+    ];
+    row.forEach((v,i)=>{ doc.text(String(v), cx, y); cx += colW[i]; });
+    y += 6.5;
+  });
+
+  // === 合計 ===
+  y += 6;
+  const tax = Math.round(p.excl * 0.1);
+  [
+    ['Subtotal (excl. tax):', p.excl],
+    ['Consumption Tax (10%):', tax],
+    ['TOTAL (incl. tax):', p.total]
+  ].forEach(([label, val], i) => {
+    if (i === 2) {
+      doc.setFillColor(26,74,138);
+      doc.rect(W-M-80, y-5, 80, 8, 'F');
+      doc.setTextColor(255,208,80); doc.setFontSize(11); doc.setFont('helvetica','bold');
+    } else {
+      doc.setTextColor(30,37,53); doc.setFontSize(9); doc.setFont('helvetica','normal');
+    }
+    doc.text(label, W-M-79, y);
+    doc.text('JPY ' + Math.round(val).toLocaleString(), W-M-2, y, {align:'right'});
+    y += 8;
+  });
+
+  // === 印鑑欄 ===
+  y += 8;
+  doc.setFont('helvetica','normal');
+  doc.setTextColor(100,110,130);
+  doc.setFontSize(8);
+  ['Checked','Confirmed','Approved'].forEach((l,i)=>{
+    const bx = M + i*42;
+    doc.rect(bx, y, 38, 20);
+    doc.text(l, bx+2, y+5);
+  });
+
+  // === フッター ===
+  doc.setFontSize(7);
+  doc.text(`Generated by Kensetsu Seisan System  ${new Date().toLocaleString('ja-JP')}`, M, 290);
+  doc.text(settings.license||'', W-M, 290, {align:'right'});
+
+  doc.save(`estimate_${p.name.slice(0,15)}_${Date.now()}.pdf`);
+  showToast('📄 PDFを出力しました');
+}
+
+function generatePDFById(id) { generatePDF(id); }
+
+/* =========================================================
+   Excel出力
+   ========================================================= */
+function exportExcel() {
+  const name = document.getElementById('f-name').value.trim() || '見積書';
+  const wb = XLSX.utils.book_new();
+
+  // 明細シート
+  const rows = [
+    ['建設積算システム - 見積書'],
+    ['工事名:', name],
+    ['発注者:', document.getElementById('f-client').value],
+    ['工事場所:', document.getElementById('f-location').value],
+    ['出力日:', new Date().toLocaleDateString('ja-JP')],
+    [],
+    ['No','材料名・工種','単位','数量','単価(円)','金額(円)','備考'],
+    ...itemRows.filter(r=>r.name).map((r,i)=>[
+      i+1, r.name, r.unit, r.qty, r.price,
+      (parseFloat(r.qty)||0)*(parseFloat(r.price)||0), r.note
+    ]),
+    [],
+    ['','','','','原価合計', itemRows.reduce((s,r)=>s+(parseFloat(r.qty)||0)*(parseFloat(r.price)||0),0)],
+    ['','','','','消費税(10%)',
+      Math.round(itemRows.reduce((s,r)=>s+(parseFloat(r.qty)||0)*(parseFloat(r.price)||0),0)*0.1)],
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(wb, ws, '見積書');
+  XLSX.writeFile(wb, `estimate_${name}.xlsx`);
+  showToast('📊 Excelを出力しました');
+}
+
+function exportAllCSV() {
+  const rows = [
+    ['案件ID','工事名','発注者','工種','場所','税込合計','粗利率','作成日'],
+    ...projects.map(p=>[
+      p.id, p.name, p.client||'', p.type,
+      p.location||'', p.total, (p.marginRate||0)+'%', fmtDate(p.createdAt)
+    ])
+  ];
+  const ws  = XLSX.utils.aoa_to_sheet(rows);
+  const wb  = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '案件一覧');
+  XLSX.writeFile(wb, `projects_${Date.now()}.csv`);
+  showToast('📥 CSV一括エクスポートしました');
+}
+
+/* =========================================================
+   設定
+   ========================================================= */
+function saveSettings() {
+  settings = {
+    company:  document.getElementById('s-company').value,
+    rep:      document.getElementById('s-rep').value,
+    address:  document.getElementById('s-addr').value,
+    tel:      document.getElementById('s-tel').value,
+    fax:      document.getElementById('s-fax').value,
+    license:  document.getElementById('s-license').value,
+    apiKey:   document.getElementById('s-apikey').value,
+    logo:     settings.logo  // ロゴはbase64のまま保持
+  };
+  localStorage.setItem('seisan_settings', JSON.stringify(settings));
+  showToast('⚙️ 設定を保存しました');
+}
+
+function loadSettings() {
+  const s = JSON.parse(localStorage.getItem('seisan_settings') || '{}');
+  settings = s;
+  if (document.getElementById('s-company')) {
+    document.getElementById('s-company').value = s.company||'';
+    document.getElementById('s-rep').value     = s.rep||'';
+    document.getElementById('s-addr').value    = s.address||'';
+    document.getElementById('s-tel').value     = s.tel||'';
+    document.getElementById('s-fax').value     = s.fax||'';
+    document.getElementById('s-license').value = s.license||'';
+    document.getElementById('s-apikey').value  = s.apiKey||'';
+    if (s.logo) {
+      const prev = document.getElementById('logo-preview');
+      prev.innerHTML = `<img src="${s.logo}" alt="ロゴ">`;
+    }
+  }
+}
+
+function previewLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    settings.logo = e.target.result;
+    document.getElementById('logo-preview').innerHTML = `<img src="${e.target.result}" alt="ロゴ">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* =========================================================
+   デモデータ
+   ========================================================= */
+function insertDemoData() {
+  const demos = [
+    {
+      id: Date.now()+1, name: '○○マンション外壁改修工事', client: '株式会社山田不動産',
+      location: '東京都渋谷区〇〇1-2-3', type: '建築', marginRate: 25,
+      cost: 4800000, excl: 6400000, total: 7040000,
+      items: [
+        { id:1, name:'足場仮設工事',  unit:'式', qty:'1',   price:'350000', note:'クサビ足場' },
+        { id:2, name:'外壁洗浄',     unit:'m²', qty:'800',  price:'500',   note:'高圧洗浄' },
+        { id:3, name:'シーリング打替', unit:'m',  qty:'1200', price:'800',   note:'変成シリコン' },
+        { id:4, name:'外壁塗装（下塗）',unit:'m²', qty:'800',  price:'1200',  note:'エポキシ系' },
+        { id:5, name:'外壁塗装（上塗）',unit:'m²', qty:'800',  price:'1800',  note:'フッ素系' },
+      ],
+      createdAt: new Date(Date.now()-86400000*3).toISOString()
+    },
+    {
+      id: Date.now()+2, name: '〇〇工場内装改修工事', client: '△△製造株式会社',
+      location: '埼玉県川口市〇〇5-6-7', type: '建築', marginRate: 18,
+      cost: 2200000, excl: 2682926, total: 2951219,
+      items: [
+        { id:6, name:'解体・撤去工事', unit:'式', qty:'1',   price:'500000', note:'' },
+        { id:7, name:'軽量鉄骨下地',   unit:'m²', qty:'300',  price:'2500',   note:'LGS65' },
+        { id:8, name:'石膏ボード張り', unit:'m²', qty:'600',  price:'1200',   note:'9.5mm' },
+        { id:9, name:'クロス貼り',     unit:'m²', qty:'580',  price:'800',    note:'量産品' },
+        { id:10,name:'床タイルカーペット',unit:'m²',qty:'200', price:'3500',   note:'タイル柄' },
+      ],
+      createdAt: new Date(Date.now()-86400000*10).toISOString()
+    },
+    {
+      id: Date.now()+3, name: '住宅新築工事（木造2階建て）', client: '田中 一郎 様',
+      location: '千葉県船橋市〇〇3-4-5', type: '建築', marginRate: 22,
+      cost: 18500000, excl: 23717948, total: 26089743,
+      items: [
+        { id:11,name:'仮設工事',       unit:'式', qty:'1',   price:'800000',  note:'' },
+        { id:12,name:'基礎工事',       unit:'式', qty:'1',   price:'2800000', note:'ベタ基礎' },
+        { id:13,name:'木工事（躯体）',  unit:'式', qty:'1',   price:'5200000', note:'在来工法' },
+        { id:14,name:'屋根工事',       unit:'式', qty:'1',   price:'1200000', note:'ガルバ鋼板' },
+        { id:15,name:'内装・設備工事',  unit:'式', qty:'1',   price:'8500000', note:'' },
+      ],
+      createdAt: new Date(Date.now()-86400000*20).toISOString()
+    }
+  ];
+
+  projects = [...demos, ...projects];
+  localStorage.setItem('seisan_projects', JSON.stringify(projects));
+  renderDashboard();
+  renderProjectList();
+  showToast('🧪 デモデータを3件追加しました');
+}
+
+function clearAllData() {
+  if (!confirm('すべての案件データを削除しますか？この操作は元に戻せません。')) return;
+  projects = [];
+  localStorage.setItem('seisan_projects', JSON.stringify([]));
+  renderDashboard();
+  renderProjectList();
+  showToast('🗑 全データを削除しました');
+}
+
+/* =========================================================
+   ユーティリティ
+   ========================================================= */
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtNum(n) {
+  const v = parseFloat(n) || 0;
+  return v > 0 ? v.toLocaleString() : '—';
+}
+
+function truncate(s, n) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0, n-1)+'…' : s;
+}
+</script>
+</body>
+</html>
